@@ -1,0 +1,77 @@
+interface Ethernet1/1
+  no switchport
+  ip address 192.168.8.2/30
+  no shutdown
+
+router bgp 888
+  address-family ipv4 unicast
+    network 8.8.8.8/32
+  neighbor 192.168.8.1
+    remote-as 65001
+    address-family ipv4 unicast
+
+===
+
+# internet側からもVXLAN経由でHostに疎通可能
+
+internet(config)# ping 192.168.100.1 source-interface loopback 0
+PING 192.168.100.1 (192.168.100.1): 56 data bytes
+64 bytes from 192.168.100.1: icmp_seq=0 ttl=61 time=14.258 ms
+64 bytes from 192.168.100.1: icmp_seq=1 ttl=61 time=9.726 ms
+64 bytes from 192.168.100.1: icmp_seq=2 ttl=61 time=10.66 ms
+64 bytes from 192.168.100.1: icmp_seq=3 ttl=61 time=10.448 ms
+64 bytes from 192.168.100.1: icmp_seq=4 ttl=61 time=15.033 ms
+
+--- 192.168.100.1 ping statistics ---
+5 packets transmitted, 5 packets received, 0.00% packet loss
+round-trip min/avg/max = 9.726/12.025/15.033 ms
+
+
+# Border Leaf側でRoute Map等で制御しないと、Border LeafからMP-BGP EVPNで学習したHost Routesも流れてくる
+
+internet(config)# show ip route 
+IP Route Table for VRF "default"
+'*' denotes best ucast next-hop
+'**' denotes best mcast next-hop
+'[x/y]' denotes [preference/metric]
+'%<string>' in via output denotes VRF <string>
+
+8.8.8.8/32, ubest/mbest: 2/0, attached
+    *via 8.8.8.8, Lo0, [0/0], 16:54:49, local
+    *via 8.8.8.8, Lo0, [0/0], 16:54:49, direct
+192.168.8.0/30, ubest/mbest: 1/0, attached
+    *via 192.168.8.2, Eth1/1, [0/0], 16:54:59, direct
+192.168.8.2/32, ubest/mbest: 1/0, attached
+    *via 192.168.8.2, Eth1/1, [0/0], 16:54:59, local
+192.168.100.0/24, ubest/mbest: 1/0
+    *via 192.168.8.1, [20/0], 00:38:46, bgp-888, external, tag 65001
+192.168.100.1/32, ubest/mbest: 1/0
+    *via 192.168.8.1, [20/0], 00:38:46, bgp-888, external, tag 65001
+192.168.200.0/24, ubest/mbest: 1/0
+    *via 192.168.8.1, [20/0], 00:38:46, bgp-888, external, tag 65001
+192.168.200.1/32, ubest/mbest: 1/0
+    *via 192.168.8.1, [20/0], 00:38:46, bgp-888, external, tag 65001
+
+# route map 適用後はこうなる
+
+internet# show ip route
+IP Route Table for VRF "default"
+'*' denotes best ucast next-hop
+'**' denotes best mcast next-hop
+'[x/y]' denotes [preference/metric]
+'%<string>' in via output denotes VRF <string>
+
+8.8.8.8/32, ubest/mbest: 2/0, attached
+    *via 8.8.8.8, Lo0, [0/0], 17:37:39, local
+    *via 8.8.8.8, Lo0, [0/0], 17:37:39, direct
+192.168.8.0/30, ubest/mbest: 1/0, attached
+    *via 192.168.8.2, Eth1/1, [0/0], 17:37:49, direct
+192.168.8.2/32, ubest/mbest: 1/0, attached
+    *via 192.168.8.2, Eth1/1, [0/0], 17:37:49, local
+192.168.100.0/24, ubest/mbest: 1/0
+    *via 192.168.8.1, [20/0], 01:21:36, bgp-888, external, tag 65001
+192.168.200.0/24, ubest/mbest: 1/0
+    *via 192.168.8.1, [20/0], 01:21:36, bgp-888, external, tag 65001
+
+===
+
