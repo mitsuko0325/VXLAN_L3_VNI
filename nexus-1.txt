@@ -75,7 +75,7 @@ vlan 300
 # VRFとL3 VNIの紐づけ
 
 # route-target autoの場合の採番方法は上記のConfiguration Guideに記載あり
-# Communityではroute-targetは手動設定していたが、Documentにある通りautoで良い。なぜならすべてのLeafはIBGPで同じASNのため、同じRTが使われることになるから。
+# Communityではroute-targetは手動設定していたが、Documentにある通りautoで良い。なぜならすべてのLeafはIBGPで同じASNかつ同じL3 VNI Numberなので、同じRTが使われることになるから。
 # ↑ DocumentにAutoはIBGPのみで動作する、EBGPの場合は手動設定の必要があるとDocumentに記載あり
 
 # bothはimport/export両方、という意味
@@ -89,7 +89,6 @@ vrf context vxlan-10300
   address-family ipv4 unicast
     route-target both auto
     route-target both auto evpn
-
 
 
 # Anycast Gatewayに使う仮想MACを設定
@@ -106,7 +105,7 @@ interface vlan 100
   fabric forwarding mode anycast-gateway
   no shut
 
-# L3 VNIは、PacketをRoutingさせるだけでいいのでIP Addressは不要(ARP使わずMAC Addressはどうやって知らせるんだろうか？)
+# L3 VNIは、PacketをRoutingさせるだけでいいのでIP Addressは不要(ARP使わずMAC Addressはどうやって知らせるんだろうか？ 宛先IPはNVEのSource Loopbackになるはずだが)
 # Routing機能は必要なので、ip forwardを設定しRouting TableをLookUPさせる
 interface vlan 300
   vrf member vxlan-10300
@@ -116,7 +115,7 @@ interface vlan 300
 # EVPN(EVPN Virtuak Instance)関連の設定
 # L2 VNIをここで指定。逆にここで指定されなかったVNIはL3 VNI判定になる？
 # BGP EVPNでMAC Address情報(どのNVE背後にあるか？)を広報する。
-# rd, rtともにautoで良い。なぜ？MAC Address情報はVRFとかはないので一緒でいいということか？
+# rd, rtともにautoで良い。これもrtは同じL2 VNIを使う場合同じ値になるから
 
 #1回目はerrorになる？2回入れたら行ける。INEにもあった
 evpn
@@ -153,8 +152,6 @@ router bgp 65001
   vrf vxlan-10300
     address-family ipv4 unicast
       network 192.168.100.0/24
-
-
 
 ===
 # この段階で、overlayのL3 VNIでのRouting Tableにおける192.168.200.0/24へのRouteのNext Hopは22.22.22.22となる
